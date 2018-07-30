@@ -1,12 +1,14 @@
 package dht 
 
 import (
-	"net"
+    "net"
+    "net/rpc"
 	"math/big"
 	"crypto/sha1"
 )
 
-func hashString(elt string) *big.Int {
+// HahsString exported
+func HashString(elt string) *big.Int {
     hasher := sha1.New()
     hasher.Write([]byte(elt))
     return new(big.Int).SetBytes(hasher.Sum(nil))
@@ -20,7 +22,7 @@ func getLocalAddress() string {
     }
     // find the first non-loopback interface with an IP address
     for _, elt := range ifaces {
-        if elt.Flags&net.FlagLoopback == 0 && elt.Flags&net.FlagUp != 0 {
+        if elt.Flags & net.FlagLoopback == 0 && elt.Flags & net.FlagUp != 0 {
             addrs, err := elt.Addrs()
             if err != nil {
                 panic("init: failed to get addresses for network interface")
@@ -47,4 +49,13 @@ func between(start, elt, end *big.Int, inclusive bool) bool {
     } else {
         return start.Cmp(elt) < 0 || elt.Cmp(end) < 0 || (inclusive && elt.Cmp(end) == 0)
     }
+}
+
+// Dial exported
+func Dial(addr string) *rpc.Client {
+	client, err := rpc.DialHTTP("tcp", addr)
+	if err != nil {
+		return nil
+	}
+	return client
 }

@@ -16,11 +16,9 @@ var command = map[string]func(args ...string) error {
 	"join": joinCmd,
 	"port": portCmd,
 	"put": putCmd,
-	/*
 	"get": getCmd,
 	"delete": deleteCmd,
 	"dump": dumpCmd,
-	*/
 }
 
 var (
@@ -69,8 +67,71 @@ func portCmd(args ...string) error {
 }
 
 func putCmd(args ...string) error {
-	node.Put(args)
+	addr := find(args[0])
+	client := dht.Dial(addr)
+	if client == nil {
+		return errors.New("Put failed. Client offline")
+	}
+	defer client.Close()
+	putArgs := dht.PutArgs{args[0], args[1]}
+	var reply bool
+	err := client.Call("Node.Put", putArgs, &reply) 
+	if err != nil {
+		return err 
+	}
+	fmt.Printf("(%v, %v) stored at %v\n", args[0], args[1], addr)
 	return nil
+}
+
+func getCmd(args ...string) error {
+	addr := find(args[0])
+	client := dht.Dial(addr)
+	if client == nil {
+		return errors.New("Get failed. Client offline")
+	}
+	defer client.Close() 
+	var reply string 
+	err := client.Call("Node.Get", args[0], &reply)
+	if err != nil {
+		return err 
+	}
+	fmt.Printf("At %v matched %v with %v\n", addr, args[0], args[1])
+	return nil
+}
+
+func deleteCmd(args ...string) error {
+	addr := find(args[0])
+	client := dht.Dial(addr)
+	if client == nil {
+		return errors.New("Delete failed. Client offline")
+	}
+	defer client.Close()
+	var reply string 
+	err := client.Call("Node.Delete", args[0], &reply)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("At %v deleted key %v\n", addr, args[0])
+	return nil
+}
+
+func dumpCmd(args ...string) error {
+	server.Dump()
+	return nil
+}
+
+func find(key string) string {
+	client := dht.Dial(node.Address + ":" + node.Port)
+	if client == nil {
+		panic(errors.New("Dial itself failed"))
+	}
+	defer client.Close() 
+	var reply string 
+	err := client.Call("Node.FindSuccessor", dht.HashString(key), &reply)
+	if err != nil {
+		fmt.Println(err)
+	}
+	return reply
 }
 
 func main() {
