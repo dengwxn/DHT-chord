@@ -104,6 +104,10 @@ func (n *Node) Notify(addr string, reply *bool) error {
 
 // FindSuccessor exported
 func (n *Node) FindSuccessor(id *big.Int, reply *string) error {
+	if n.id == id {
+		*reply = n.Address + ":" + n.Port
+		return nil
+	}
 	if between(n.id, id, HashString(n.successor), true) {
 		*reply = n.successor
 		return nil
