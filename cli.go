@@ -24,7 +24,7 @@ var command = map[string]func(args ...string) error {
 var (
 	node *dht.Node 
 	server *dht.Server 
-	port = "3410"
+	port = "3410" 
 )
 
 func helpCmd(args ...string) error {
@@ -41,6 +41,7 @@ func createCmd(args ...string) error {
 }
 
 func quitCmd(args ...string) error {
+	// migrate data
 	server.Quit();
 	os.Exit(0)
 	return nil
@@ -73,7 +74,10 @@ func putCmd(args ...string) error {
 		return errors.New("Put failed. Client offline")
 	}
 	defer client.Close()
-	putArgs := dht.PutArgs{args[0], args[1]}
+	putArgs := dht.PutArgs { 
+		Key: args[0],
+		Val: args[1],
+	}
 	var reply bool
 	err := client.Call("Node.Put", putArgs, &reply) 
 	if err != nil {
@@ -123,7 +127,7 @@ func dumpCmd(args ...string) error {
 func find(key string) string {
 	client := dht.Dial(node.Address + ":" + node.Port)
 	if client == nil {
-		panic(errors.New("Dial itself failed"))
+		panic(errors.New("Dial localhost failed"))
 	}
 	defer client.Close() 
 	var reply string 

@@ -7,7 +7,7 @@ import (
 	"crypto/sha1"
 )
 
-// HahsString exported
+// HashString exported
 func HashString(elt string) *big.Int {
     hasher := sha1.New()
     hasher.Write([]byte(elt))

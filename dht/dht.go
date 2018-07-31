@@ -82,7 +82,7 @@ func (n *Node) join(addr string) {
 	n.predecessor = ""
 	successor, err := rpcFindSuccessor(addr, HashString(n.Address + ":" + n.Port))
 	if err != nil {
-		fmt.Println("Join failed.", err)
+		fmt.Println("Join failed:", err)
 		return
 	}
 	n.successor = successor
