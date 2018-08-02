@@ -1,6 +1,7 @@
 package dht 
 
 import (
+    "time"
     "net"
     "net/rpc"
 	"math/big"
@@ -58,4 +59,14 @@ func Dial(addr string) *rpc.Client {
 		return nil
 	}
 	return client
+}
+
+// TimeDate exported
+func TimeDate() string {
+    return time.Now().Format("2006-01-02 15:04:05")
+}
+
+// TimeClock exported
+func TimeClock() string {
+    return time.Now().Format("15:04:05.000000")
 }

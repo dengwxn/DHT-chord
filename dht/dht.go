@@ -12,7 +12,7 @@ import (
 
 // Node exported
 type Node struct {
-	Address, Port, successor, predecessor string 
+	IP, successor, predecessor string 
 	data map[string]string
 	id *big.Int 
 }
@@ -26,8 +26,7 @@ type PutArgs struct {
 func NewNode(port string) *Node {
 	addr := getLocalAddress()
 	return &Node {
-		Address: addr,
-		Port: port, 
+		IP: addr + ":" + port,
 		data: make(map[string]string),
 		id: HashString(addr + ":" + port),
 	}
@@ -39,12 +38,12 @@ func (n *Node) stabilize() {
 		if between(n.id, HashString(x), HashString(n.successor), false) {
 			n.successor = x
 		}
-		err = rpcNotify(n.successor, n.Address + ":" + n.Port)
-		if err != nil {
-			fmt.Println(err)
-		}
 	} else {
-		fmt.Println(err)
+		fmt.Println(TimeClock(), err, "from", n.successor)
+	}
+	err = rpcNotify(n.successor, n.IP)
+	if err != nil {
+		fmt.Println(TimeClock(), err)
 	}
 }
 
@@ -52,6 +51,12 @@ func (n *Node) checkPredecessor() {
 	client := Dial(n.predecessor)
 	if client == nil {
 		n.predecessor = ""
+	} else {
+		var reply bool
+		err := client.Call("Node.Ping", true, &reply)
+		if err != nil {
+			n.predecessor = ""
+		}
 	}
 }
 
@@ -73,23 +78,23 @@ func (n *Node) checkPredecessorPeriodically() {
 
 func (n *Node) create() {
 	n.predecessor = ""
-	n.successor = n.Address + ":" + n.Port 
+	n.successor = n.IP 
 	go n.stabilizePeriodically()
 	go n.checkPredecessorPeriodically()
 }
 
-func (n *Node) join(addr string) {
+func (n *Node) join(addr string) error {
 	n.predecessor = ""
-	successor, err := rpcFindSuccessor(addr, HashString(n.Address + ":" + n.Port))
+	successor, err := rpcFindSuccessor(addr, HashString(n.IP))
 	if err != nil {
-		fmt.Println("Join failed:", err)
-		return
+		return err
 	}
 	n.successor = successor
+	return nil
 }
 
 // GetPredecessor exported
-func (n *Node) GetPredecessor(_, addr *string) error {
+func (n *Node) GetPredecessor(none bool, addr *string) error {
 	*addr = n.predecessor
 	return nil
 }
@@ -105,7 +110,7 @@ func (n *Node) Notify(addr string, reply *bool) error {
 // FindSuccessor exported
 func (n *Node) FindSuccessor(id *big.Int, reply *string) error {
 	if n.id == id {
-		*reply = n.Address + ":" + n.Port
+		*reply = n.IP
 		return nil
 	}
 	if between(n.id, id, HashString(n.successor), true) {
@@ -130,13 +135,27 @@ func (n *Node) Get(key string, reply *string) error {
 	return nil
 }
 
+// Delete exported
+func (n *Node) Delete(key string, reply *bool) error {
+	if n.data[key] != "" {
+		*reply = true
+		delete(n.data, key)
+	}
+	return nil
+}
+
+// Ping exported
+func (n *Node) Ping(none bool, reply *bool) error {
+	return nil
+}
+
 func rpcGetPredecessor(addr string) (string, error) {
 	if addr == "" {
-		return "", errors.New("Find predecessor: lack valid address") 
+		return "", errors.New("Get predecessor: lack valid address") 
 	}
 	client := Dial(addr)
 	if client == nil {
-		return "", errors.New("Find predecessor: client offline")
+		return "", errors.New("Get predecessor: client offline")
 	}
 	defer client.Close() 
 	var reply string 
@@ -145,7 +164,7 @@ func rpcGetPredecessor(addr string) (string, error) {
 		return "", err 
 	}
 	if reply == "" {
-		return "", errors.New("Find predecessor: Predecessor not found") 
+		return "", errors.New("Get predecessor: predecessor not found") 
 	}
 	return reply, nil
 }
@@ -181,6 +200,7 @@ func rpcFindSuccessor(addr string, id *big.Int) (string, error) {
 type Server struct {
 	node *Node 
 	listener net.Listener
+	Listening bool
 }
 
 // NewServer exported
@@ -191,34 +211,44 @@ func NewServer(n *Node) *Server {
 }
 
 // Listen exported
-func (s *Server) Listen() {
+func (s *Server) Listen() error {
 	rpc.Register(s.node)
 	rpc.HandleHTTP()
-	l, e := net.Listen("tcp", ":" + s.node.Port)
+	l, e := net.Listen("tcp", s.node.IP)
 	if e != nil {
-		panic(e)
+		return e
 	}
 	s.node.create()
 	s.listener = l
+	s.Listening = true
 	go http.Serve(l, nil)
+	return nil
 }
 
 // Quit exported
 func (s *Server) Quit() {
+	s.Listening = false
 	s.listener.Close()
 }
 
 // Join exported
-func (s *Server) Join(addr string) {
-	s.Listen()
-	s.node.join(addr)
+func (s *Server) Join(addr string) error {
+	err := s.Listen()
+	if err != nil {
+		return err
+	}
+	err = s.node.join(addr)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // Dump exported 
 func (s *Server) Dump() {
-	fmt.Println("Address:", s.node.Address + ":" + s.node.Port)
-	fmt.Println("ID:", s.node.id)
-	fmt.Println("Successor:", s.node.successor)
-	fmt.Println("Predecessor:", s.node.predecessor)
-	fmt.Println("Data:", s.node.data)
+	fmt.Println(TimeClock(), "Address:", s.node.IP)
+	fmt.Println(TimeClock(), "ID:", s.node.id)
+	fmt.Println(TimeClock(), "Successor:", s.node.successor)
+	fmt.Println(TimeClock(), "Predecessor:", s.node.predecessor)
+	fmt.Println(TimeClock(), "Data:", s.node.data)
 }
