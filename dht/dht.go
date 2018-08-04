@@ -1,10 +1,9 @@
 package dht 
 
 import (
-	"fmt"
 	"time"
 	"net"
-	"net/http"
+	"fmt"
 	"net/rpc"
 	"math/big"
 	"errors"
@@ -39,11 +38,11 @@ func (n *Node) stabilize() {
 			n.successor = x
 		}
 	} else {
-		fmt.Println(TimeClock(), err, "from", n.successor)
+		Cyan.Println(TimeClock(), err, "from", n.successor)
 	}
 	err = rpcNotify(n.successor, n.IP)
 	if err != nil {
-		fmt.Println(TimeClock(), err)
+		Cyan.Println(TimeClock(), err)
 	}
 }
 
@@ -61,7 +60,7 @@ func (n *Node) checkPredecessor() {
 }
 
 func (n *Node) stabilizePeriodically() {
-	period := time.Tick(1 * time.Second)
+	period := time.Tick(333 * time.Millisecond)
 	for {
 		<-period 
 		n.stabilize()
@@ -69,7 +68,7 @@ func (n *Node) stabilizePeriodically() {
 }
 
 func (n *Node) checkPredecessorPeriodically() {
-	period := time.Tick(1 * time.Second)
+	period := time.Tick(333 * time.Millisecond)
 	for {
 		<-period 
 		n.checkPredecessor()
@@ -196,24 +195,25 @@ func rpcFindSuccessor(addr string, id *big.Int) (string, error) {
 	return reply, err
 }
 
-// Server exported
-type Server struct {
+// RPCServer exported
+type RPCServer struct {
 	node *Node 
+	server *rpc.Server
 	listener net.Listener
 	Listening bool
 }
 
-// NewServer exported
-func NewServer(n *Node) *Server {
-	return &Server {
+// NewRPCServer exported
+func NewRPCServer(n *Node) *RPCServer {
+	return &RPCServer {
 		node : n,
 	}
 }
 
 // Listen exported
-func (s *Server) Listen() error {
-	rpc.Register(s.node)
-	rpc.HandleHTTP()
+func (s *RPCServer) Listen() error {
+	s.server = rpc.NewServer()
+	s.server.Register(s.node)
 	l, e := net.Listen("tcp", s.node.IP)
 	if e != nil {
 		return e
@@ -221,18 +221,18 @@ func (s *Server) Listen() error {
 	s.node.create()
 	s.listener = l
 	s.Listening = true
-	go http.Serve(l, nil)
+	go s.server.Accept(l)
 	return nil
 }
 
 // Quit exported
-func (s *Server) Quit() {
+func (s *RPCServer) Quit() {
 	s.Listening = false
 	s.listener.Close()
 }
 
 // Join exported
-func (s *Server) Join(addr string) error {
+func (s *RPCServer) Join(addr string) error {
 	err := s.Listen()
 	if err != nil {
 		return err
@@ -245,7 +245,7 @@ func (s *Server) Join(addr string) error {
 }
 
 // Dump exported 
-func (s *Server) Dump() {
+func (s *RPCServer) Dump() {
 	fmt.Println(TimeClock(), "Address:", s.node.IP)
 	fmt.Println(TimeClock(), "ID:", s.node.id)
 	fmt.Println(TimeClock(), "Successor:", s.node.successor)

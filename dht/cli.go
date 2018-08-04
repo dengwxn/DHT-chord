@@ -4,35 +4,34 @@ import "C"
 
 import (
 	"os"
-	"fmt"
 	"errors"
 )
 
 // Chord exported
 type Chord struct {
-	node *Node 
-	server *Server 
+	Node *Node 
+	server *RPCServer 
 	port string
 }
 
 // HelpCmd exported
 func (c *Chord) HelpCmd(args ...string) error {
-	fmt.Println(TimeClock(), "Available commands: help, quit, port, create, join, dump, put, get, delete")
+	Magenta.Println(TimeClock(), "Available commands: help, quit, port, create, join, dump, put, get, delete")
 	return nil 
 } 
 
 // CreateCmd exported
 func (c *Chord) CreateCmd(args ...string) error {
-	if c.node != nil {
-		return errors.New("Create failed: have created or joined")
+	if c.Node != nil {
+		return errors.New("Create: have created or joined")
 	}
 	c.dispatch()
 	err := c.server.Listen()
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(TimeClock(), "Creating new ring")
-	fmt.Printf("%v Listening at %v\n", TimeClock(), c.node.IP)
+	Magenta.Println(TimeClock(), "Creating new ring")
+	Magenta.Printf("%v Listening at %v\n", TimeClock(), c.Node.IP)
 	return nil
 }
 
@@ -48,31 +47,31 @@ func (c *Chord) QuitCmd(args ...string) error {
 
 // JoinCmd exported
 func (c *Chord) JoinCmd(args ...string) error {
-	if c.node != nil {
-		return errors.New("Join failed: have created or joined")
+	if c.Node != nil {
+		return errors.New("Join: have created or joined")
 	}
 	if len(args) < 1 {
-		return errors.New("Join failed: lack valid address")
+		return errors.New("Join: lack valid address")
 	}
 	c.dispatch()
 	err := c.server.Join(args[0])
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("%v Join at %v\n", TimeClock(), args[0])
+	Magenta.Printf("%v Join at %v\n", TimeClock(), args[0])
 	return nil
 }
 
 // PortCmd exported
 func (c *Chord) PortCmd(args ...string) error {
 	if len(args) < 1 {
-		fmt.Printf("%v Current port is %v\n", TimeClock(), c.port)
+		Magenta.Printf("%v Current port is %v\n", TimeClock(), c.port)
 	} else {
-		if c.node != nil {
+		if c.Node != nil {
 			return errors.New("Can't change port now")
 		}
 		c.port = args[0]
-		fmt.Printf("%v Port set to %v\n", TimeClock(), c.port)
+		Magenta.Printf("%v Port set to %v\n", TimeClock(), c.port)
 	}
 	return nil
 }
@@ -82,7 +81,7 @@ func (c *Chord) PutCmd(args ...string) error {
 	addr := c.find(args[0])
 	client := Dial(addr)
 	if client == nil {
-		return errors.New("Put failed. Client offline")
+		return errors.New("Put: client offline")
 	}
 	defer client.Close()
 	putArgs := PutArgs { 
@@ -94,7 +93,7 @@ func (c *Chord) PutCmd(args ...string) error {
 	if err != nil {
 		return err 
 	}
-	fmt.Printf("%v Put (%v, %v) at %v\n", TimeClock(), args[0], args[1], addr)
+	Magenta.Printf("%v Put (%v, %v) at %v\n", TimeClock(), args[0], args[1], addr)
 	return nil
 }
 
@@ -103,7 +102,7 @@ func (c *Chord) GetCmd(args ...string) error {
 	addr := c.find(args[0])
 	client := Dial(addr)
 	if client == nil {
-		return errors.New("Get failed. Client offline")
+		return errors.New("Get: client offline")
 	}
 	defer client.Close() 
 	var reply string 
@@ -112,9 +111,10 @@ func (c *Chord) GetCmd(args ...string) error {
 		return err 
 	}
 	if reply != "" {
-		fmt.Printf("%v Get %v with %v at %v\n", TimeClock(), args[0], reply, addr)
+		Magenta.Printf("%v Get (%v, %v) at %v\n", TimeClock(), args[0], reply, addr)
 	} else {
-		fmt.Printf("%v Fail to get %v at %v\n", TimeClock(), args[0], addr)
+		Yellow.Printf("%v Fail to get %v at %v\n", TimeClock(), args[0], addr)
+		return errors.New("Get: match not found")
 	}
 	return nil
 }
@@ -124,7 +124,7 @@ func (c *Chord) DeleteCmd(args ...string) error {
 	addr := c.find(args[0])
 	client := Dial(addr)
 	if client == nil {
-		return errors.New("Delete failed. Client offline")
+		return errors.New("Delete: client offline")
 	}
 	defer client.Close()
 	var reply bool
@@ -133,20 +133,22 @@ func (c *Chord) DeleteCmd(args ...string) error {
 		return err
 	}
 	if reply == true {
-		fmt.Printf("%v Deleted key %v at %v\n", TimeClock(), args[0], addr)
+		Magenta.Printf("%v Deleted key %v at %v\n", TimeClock(), args[0], addr)
 	} else {
-		fmt.Printf("%v Fail to delete key %v at %v\n", TimeClock(), args[0], addr)
+		Yellow.Printf("%v Fail to delete key %v at %v\n", TimeClock(), args[0], addr)
+		return errors.New("Delete: match not found")
 	}
 	return nil
 }
 
-func (c *Chord) dumpCmd(args ...string) error {
+// DumpCmd exported
+func (c *Chord) DumpCmd(args ...string) error {
 	c.server.Dump()
 	return nil
 }
 
 func (c *Chord) find(key string) string {
-	client := Dial(c.node.IP)
+	client := Dial(c.Node.IP)
 	if client == nil {
 		panic(errors.New("Dial localhost failed"))
 	}
@@ -154,13 +156,12 @@ func (c *Chord) find(key string) string {
 	var reply string 
 	err := client.Call("Node.FindSuccessor", HashString(key), &reply)
 	if err != nil {
-		fmt.Println(TimeClock(), err)
+		Yellow.Println(TimeClock(), err)
 	}
-	fmt.Println(key, HashString(key), reply)
 	return reply
 }
 
 func (c *Chord) dispatch() {
-	c.node = NewNode(c.port)
-	c.server = NewServer(c.node)
+	c.Node = NewNode(c.port)
+	c.server = NewRPCServer(c.Node)
 }

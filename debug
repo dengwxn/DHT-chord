@@ -1,0 +1,10 @@
+2018-08-03 16:01:13 Welcome to the dht machine testing
+2018-08-03 16:01:13 by Rivers Deng, Summer 2018
+16:01:13.314300
+16:01:13.314305 Test starts
+16:01:13.314309 Port set to 8000
+16:01:13.314658 Creating new ring
+16:01:13.314674 Listening at 192.168.0.72:8000
+16:01:13.650309 Get predecessor: predecessor not found from 192.168.0.72:8000
+16:01:14.314965 Port set to 8001
+16:01:14.317250 Join at 192.168.0.72:8000

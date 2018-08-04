@@ -6,6 +6,20 @@ import (
     "net/rpc"
 	"math/big"
 	"crypto/sha1"
+	"github.com/fatih/color"
+)
+
+var (
+    // Blue exported
+	Blue = color.New(color.FgBlue)
+    // Magenta exported
+    Magenta = color.New(color.FgMagenta)
+    // Cyan exported
+    Cyan = color.New(color.FgCyan)
+    // Yellow exported
+    Yellow = color.New(color.FgYellow)
+    // Green exported
+    Green = color.New(color.FgGreen)
 )
 
 // HashString exported
@@ -54,7 +68,7 @@ func between(start, elt, end *big.Int, inclusive bool) bool {
 
 // Dial exported
 func Dial(addr string) *rpc.Client {
-	client, err := rpc.DialHTTP("tcp", addr)
+	client, err := rpc.Dial("tcp", addr)
 	if err != nil {
 		return nil
 	}
