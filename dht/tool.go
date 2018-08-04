@@ -20,6 +20,8 @@ var (
     Yellow = color.New(color.FgYellow)
     // Green exported
     Green = color.New(color.FgGreen)
+    // Red exported
+    Red = color.New(color.FgRed)
 )
 
 // HashString exported

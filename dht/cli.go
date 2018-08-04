@@ -78,7 +78,7 @@ func (c *Chord) PortCmd(args ...string) error {
 
 // PutCmd exported
 func (c *Chord) PutCmd(args ...string) error {
-	addr := c.find(args[0])
+	addr := c.Node.find(args[0])
 	client := Dial(addr)
 	if client == nil {
 		return errors.New("Put: client offline")
@@ -99,7 +99,7 @@ func (c *Chord) PutCmd(args ...string) error {
 
 // GetCmd exported
 func (c *Chord) GetCmd(args ...string) error {
-	addr := c.find(args[0])
+	addr := c.Node.find(args[0])
 	client := Dial(addr)
 	if client == nil {
 		return errors.New("Get: client offline")
@@ -121,7 +121,7 @@ func (c *Chord) GetCmd(args ...string) error {
 
 // DeleteCmd exported
 func (c *Chord) DeleteCmd(args ...string) error {
-	addr := c.find(args[0])
+	addr := c.Node.find(args[0])
 	client := Dial(addr)
 	if client == nil {
 		return errors.New("Delete: client offline")
@@ -145,20 +145,6 @@ func (c *Chord) DeleteCmd(args ...string) error {
 func (c *Chord) DumpCmd(args ...string) error {
 	c.server.Dump()
 	return nil
-}
-
-func (c *Chord) find(key string) string {
-	client := Dial(c.Node.IP)
-	if client == nil {
-		panic(errors.New("Dial localhost failed"))
-	}
-	defer client.Close() 
-	var reply string 
-	err := client.Call("Node.FindSuccessor", HashString(key), &reply)
-	if err != nil {
-		Yellow.Println(TimeClock(), err)
-	}
-	return reply
 }
 
 func (c *Chord) dispatch() {
