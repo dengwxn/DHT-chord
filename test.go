@@ -49,13 +49,11 @@ func testNaive() {
 			putCmd(i)
 		}
 	}
-	/*
 	for i := 0; i < 5; i++ {
 		for j := 1; j <= data; j++ {
 			getCmd(i, j)
 		}
 	}
-	*/
 	dht.Green.Printf("Test Naive Complete: %.2f%% Correct\n", float64(opCount[1] - opCount[0]) / float64(opCount[1]) * 100)
 }
 
@@ -73,13 +71,11 @@ func testAlpha() {
 		for j := 0; j < 5; j++ {
 			putCmd(i)
 		}
-		/*
 		for j := 0; j < 10; j++ {
 			for k := 1; k <= data; k++ {
 				getCmd(j, k)
 			}
 		}
-		*/
 	}
 	dht.Green.Printf("Test Alpha Complete: %.2f%% Correct\n", float64(opCount[1] - opCount[0]) / float64(opCount[1]) * 100)
 }
@@ -93,15 +89,13 @@ func testBeta() {
 	for i := 0; i < 9; i++ {
 		c[i].QuitCmd()
 		time.Sleep(1 * time.Second)
-		/*
 		for j := i + 1; j < 10; j++ {
 			for k := 1; k <= data; k++ {
 				getCmd(j, k)
 			}
 		}
-		*/
 	}
-	dht.Green.Printf("Test Alpha Complete: %.2f%% Correct\n", float64(opCount[1] - opCount[0]) / float64(opCount[1]) * 100)
+	dht.Green.Printf("Test Beta Complete: %.2f%% Correct\n", float64(opCount[1] - opCount[0]) / float64(opCount[1]) * 100)
 }
 
 func testGamma() {
@@ -111,10 +105,13 @@ func testGamma() {
 	opCount[1] = 0
 
 	
-	for i := 10; i < 15; i++ {
+	for i := 10; i < 20; i++ {
 		c[i].PortCmd(strconv.Itoa(8000 + i))
 		c[i].JoinCmd(c[i - 1].Node.IP)
 		time.Sleep(1 * time.Second)
+		for j := 0; j < 5; j++ {
+			putCmd(i)
+		}
 		for j := 9; j <= i; j++ {
 			for k := 1; k <= data; k++ {
 				getCmd(j, k)
@@ -122,7 +119,7 @@ func testGamma() {
 		}
 	}
 	
-	dht.Green.Printf("Test Alpha Complete: %.2f%% Correct\n", float64(opCount[1] - opCount[0]) / float64(opCount[1]) * 100)
+	dht.Green.Printf("Test Gamma Complete: %.2f%% Correct\n", float64(opCount[1] - opCount[0]) / float64(opCount[1]) * 100)
 }
 
 func main() {

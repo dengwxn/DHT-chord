@@ -15,6 +15,8 @@ type Node struct {
 	data map[string]string
 	id *big.Int
 	listening bool
+	next int
+	finger [13]string
 }
 
 // PutArgs exported
@@ -89,6 +91,14 @@ func (n *Node) checkPredecessor() {
 	}
 }
 
+func (n *Node) fixFingers() {
+	n.next++
+	if (n.next > 12) {
+		n.next = 1
+	}
+	n.finger[n.next], _ = rpcFindSuccessor(n.IP, jump(n.IP, n.next))
+}
+
 func (n *Node) stabilizePeriodically() {
 	period := time.Tick(333 * time.Millisecond)
 	for {
@@ -111,6 +121,17 @@ func (n *Node) checkPredecessorPeriodically() {
 	}
 }
 
+func (n *Node) fixFingersPeriodically() {
+	period := time.Tick(333 * time.Millisecond)
+	for {
+		if !n.listening {
+			break
+		}
+		<-period
+		n.fixFingers()
+	}
+}
+
 func (n *Node) create() {
 	n.predecessor = ""
 	for i := 0; i < 3; i++ {
@@ -118,6 +139,7 @@ func (n *Node) create() {
 	}
 	go n.stabilizePeriodically()
 	go n.checkPredecessorPeriodically()
+	go n.fixFingersPeriodically()
 }
 
 func (n *Node) join(addr string) error {
@@ -147,10 +169,6 @@ func (n *Node) Notify(addr string, reply *bool) error {
 
 // FindSuccessor exported
 func (n *Node) FindSuccessor(id *big.Int, reply *string) error {
-	if n.id == id {
-		*reply = n.IP
-		return nil
-	}
 	for _, suc := range n.successor {
 		status := ping(suc)
 		if !status {
@@ -160,11 +178,36 @@ func (n *Node) FindSuccessor(id *big.Int, reply *string) error {
 			*reply = suc
 			return nil
 		}
+		break
+	}
+	cpn := n.closestPrecedingNode(id)
+	if cpn != "" {
 		var err error
-		*reply, err = rpcFindSuccessor(suc, id)
+		*reply, err = rpcFindSuccessor(cpn, id)
 		return err
 	}
 	return errors.New("find successor: successor not found")
+}
+
+func (n *Node) closestPrecedingNode(id *big.Int) string {
+	for i := 12; i > 0; i-- {
+		status := ping(n.finger[i])
+		if status {
+			if between(HashString(n.IP), HashString(n.finger[i]), id, false) {
+				return n.finger[i]
+			}
+		}
+	}
+	for i := 2; i >= 0; i-- {
+		suc := n.successor[i]
+		status := ping(suc)
+		if status {
+			if between(HashString(n.IP), HashString(suc), id, false) {
+				return suc
+			}
+		}
+	}
+	return ""
 }
 
 // Put exported
