@@ -85,7 +85,6 @@ func testBeta() {
 	dht.Magenta.Println(dht.TimeClock(), "Test Beta starts")
 	opCount[0] = 0
 	opCount[1] = 0
-
 	for i := 0; i < 9; i++ {
 		c[i].QuitCmd()
 		time.Sleep(1 * time.Second)
@@ -103,8 +102,6 @@ func testGamma() {
 	dht.Magenta.Println(dht.TimeClock(), "Test Gamma starts")
 	opCount[0] = 0
 	opCount[1] = 0
-
-	
 	for i := 10; i < 20; i++ {
 		c[i].PortCmd(strconv.Itoa(8000 + i))
 		c[i].JoinCmd(c[i - 1].Node.IP)
@@ -118,7 +115,6 @@ func testGamma() {
 			}
 		}
 	}
-	
 	dht.Green.Printf("Test Gamma Complete: %.2f%% Correct\n", float64(opCount[1] - opCount[0]) / float64(opCount[1]) * 100)
 }
 
