@@ -3,7 +3,6 @@ package dht
 import "C"
 
 import (
-	"os"
 	"errors"
 )
 
@@ -39,9 +38,19 @@ func (c *Chord) CreateCmd(args ...string) error {
 func (c *Chord) QuitCmd(args ...string) error {
 	// migrate data
 	if c.server != nil {
-		c.server.Quit();
+		defer c.server.Quit()
+		for _, suc := range c.Node.successor {
+			status := ping(suc)
+			if !status {
+				continue
+			}
+			err := c.Node.migrateWhenQuiting(suc)
+			if err != nil {
+				return err
+			}
+			break
+		}
 	}
-	os.Exit(0)
 	return nil
 }
 

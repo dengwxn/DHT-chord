@@ -63,9 +63,8 @@ func getLocalAddress() string {
 func between(start, elt, end *big.Int, inclusive bool) bool {
     if end.Cmp(start) > 0 {
         return (start.Cmp(elt) < 0 && elt.Cmp(end) < 0) || (inclusive && elt.Cmp(end) == 0)
-    } else {
-        return start.Cmp(elt) < 0 || elt.Cmp(end) < 0 || (inclusive && elt.Cmp(end) == 0)
     }
+    return start.Cmp(elt) < 0 || elt.Cmp(end) < 0 || (inclusive && elt.Cmp(end) == 0)
 }
 
 // Dial exported

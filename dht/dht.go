@@ -10,9 +10,11 @@ import (
 
 // Node exported
 type Node struct {
-	IP, successor, predecessor string
-	data                       map[string]string
-	id                         *big.Int
+	successor [3]string
+	IP, predecessor string
+	data map[string]string
+	id *big.Int
+	listening bool
 }
 
 // PutArgs exported
@@ -30,38 +32,69 @@ func NewNode(port string) *Node {
 	}
 }
 
-func (n *Node) stabilize() {
-	x, err := rpcGetPredecessor(n.successor)
-	if err == nil {
-		if between(n.id, HashString(x), HashString(n.successor), false) {
-			n.successor = x
-		}
-	} else {
-		Cyan.Println(TimeClock(), err, "from", n.successor)
-	}
-	err = rpcNotify(n.successor, n.IP)
+func ping(addr string) (bool) {
+	client := Dial(addr)
+	if client == nil {
+		return false
+	} 
+	defer client.Close()
+	var reply bool
+	err := client.Call("Node.Ping", true, &reply)
 	if err != nil {
-		Cyan.Println(TimeClock(), err)
+		return false
+	}
+	return true
+}
+
+func (n *Node) stabilize() {
+	for _, suc := range n.successor {
+		status := ping(suc)
+		if !status {
+			continue
+		}
+		n.successor[0] = suc
+		x, err := rpcGetPredecessor(suc)
+		if err == nil {
+			if between(n.id, HashString(x), HashString(suc), false) {
+				n.successor[0] = x
+			}
+		} else {
+			Cyan.Println(TimeClock(), "stabilize:", err, "from", suc, "at", n.IP)
+		}
+		ok := true
+		client := Dial(suc)
+		defer client.Close()
+		for i := 1; i < 3; i++ {
+			err = client.Call("Node.PassSuccessor", i - 1, &n.successor[i])
+			if err != nil {
+				Cyan.Println(TimeClock(), "stabilize: pass successor", err, "from", suc)
+				ok = false
+			}
+		}
+		if !ok {
+			continue
+		}
+		err = rpcNotify(n.successor[0], n.IP)
+		if err != nil {
+			Cyan.Println(TimeClock(), "stabilize:", err, "when notifying", n.successor[0], "at", n.IP)
+		}
+		break
 	}
 }
 
 func (n *Node) checkPredecessor() {
-	client := Dial(n.predecessor)
-	if client == nil {
+	status := ping(n.predecessor)
+	if !status {
 		n.predecessor = ""
-	} else {
-		defer client.Close()
-		var reply bool
-		err := client.Call("Node.Ping", true, &reply)
-		if err != nil {
-			n.predecessor = ""
-		}
 	}
 }
 
 func (n *Node) stabilizePeriodically() {
 	period := time.Tick(333 * time.Millisecond)
 	for {
+		if !n.listening {
+			break
+		}
 		<-period
 		n.stabilize()
 	}
@@ -70,6 +103,9 @@ func (n *Node) stabilizePeriodically() {
 func (n *Node) checkPredecessorPeriodically() {
 	period := time.Tick(333 * time.Millisecond)
 	for {
+		if !n.listening {
+			break
+		}
 		<-period
 		n.checkPredecessor()
 	}
@@ -77,7 +113,9 @@ func (n *Node) checkPredecessorPeriodically() {
 
 func (n *Node) create() {
 	n.predecessor = ""
-	n.successor = n.IP
+	for i := 0; i < 3; i++ {
+		n.successor[i] = n.IP
+	}
 	go n.stabilizePeriodically()
 	go n.checkPredecessorPeriodically()
 }
@@ -88,8 +126,8 @@ func (n *Node) join(addr string) error {
 	if err != nil {
 		return err
 	}
-	n.successor = successor
-	err = rpcMigrateJoin(successor, n.IP)
+	n.successor[0] = successor
+	err = rpcMigrateWhenJoining(successor, n.IP)
 	return err
 }
 
@@ -113,14 +151,20 @@ func (n *Node) FindSuccessor(id *big.Int, reply *string) error {
 		*reply = n.IP
 		return nil
 	}
-	//Red.Println(n.IP, n.successor)
-	if between(n.id, id, HashString(n.successor), true) {
-		*reply = n.successor
-		return nil
+	for _, suc := range n.successor {
+		status := ping(suc)
+		if !status {
+			continue
+		}
+		if between(n.id, id, HashString(suc), true) {
+			*reply = suc
+			return nil
+		}
+		var err error
+		*reply, err = rpcFindSuccessor(suc, id)
+		return err
 	}
-	var err error
-	*reply, err = rpcFindSuccessor(n.successor, id)
-	return err
+	return errors.New("find successor: successor not found")
 }
 
 // Put exported
@@ -150,21 +194,22 @@ func (n *Node) Ping(none bool, reply *bool) error {
 	return nil
 }
 
-// MigrateJoin exported
-func (n *Node) MigrateJoin(addr string, reply *bool) error {
+// MigrateWhenJoining exported
+func (n *Node) MigrateWhenJoining(addr string, reply *bool) error {
 	client := Dial(addr)
 	if client == nil {
-		return errors.New("Put: client offline")
+		Green.Println(addr)
+		return errors.New("Migrate when joining: client offline")
 	}
 	defer client.Close()
 	for k, v := range n.data {
 		if between(HashString(k), HashString(addr), HashString(n.IP), true) {
 			n.Delete(k, reply)
-			putArgs := PutArgs{
+			putArgs := PutArgs {
 				Key: k,
 				Val: v,
 			}
-			err := client.Call("Node.Put", putArgs, &reply)
+			err := client.Call("Node.Put", putArgs, reply)
 			if err != nil {
 				return err
 			}
@@ -174,13 +219,41 @@ func (n *Node) MigrateJoin(addr string, reply *bool) error {
 	return nil
 }
 
+func (n *Node) migrateWhenQuiting(addr string) error {
+	client := Dial(addr)
+	if client == nil {
+		return errors.New("Migrate when quiting: client offline")
+	}
+	defer client.Close()
+	var reply bool
+	for k, v := range n.data {
+		n.Delete(k, &reply)
+		putArgs := PutArgs {
+			Key: k, 
+			Val: v,
+		}
+		err := client.Call("Node.Put", putArgs, &reply)
+		if err != nil {
+			return err
+		}
+		Magenta.Printf("%v Migrate (%v, %v) to %v\n", TimeClock(), k, v, addr)
+	}
+	return nil
+}
+
+// PassSuccessor exported
+func (n *Node) PassSuccessor(nth int, successor *string) error {
+	*successor = n.successor[nth]
+	return nil
+}
+
 func rpcGetPredecessor(addr string) (string, error) {
 	if addr == "" {
-		return "", errors.New("Get predecessor: lack valid address")
+		return "", errors.New("get predecessor: lack valid address")
 	}
 	client := Dial(addr)
 	if client == nil {
-		return "", errors.New("Get predecessor: client offline")
+		return "", errors.New("get predecessor: client offline")
 	}
 	defer client.Close()
 	var reply string
@@ -189,18 +262,18 @@ func rpcGetPredecessor(addr string) (string, error) {
 		return "", err
 	}
 	if reply == "" {
-		return "", errors.New("Get predecessor: predecessor not found")
+		return "", errors.New("get predecessor: predecessor not found")
 	}
 	return reply, nil
 }
 
 func rpcNotify(addr, predecessor string) error {
 	if addr == "" {
-		return errors.New("Notify: lack valid address")
+		return errors.New("notify: lack valid address")
 	}
 	client := Dial(addr)
 	if client == nil {
-		return errors.New("Notify: client offline")
+		return errors.New("notify: client offline")
 	}
 	defer client.Close()
 	var reply bool
@@ -209,11 +282,11 @@ func rpcNotify(addr, predecessor string) error {
 
 func rpcFindSuccessor(addr string, id *big.Int) (string, error) {
 	if addr == "" {
-		return "", errors.New("Find successor: lack valid address")
+		return "", errors.New("find successor: lack valid address")
 	}
 	client := Dial(addr)
 	if client == nil {
-		return "", errors.New("Find successor: client offline")
+		return "", errors.New("find successor: client offline")
 	}
 	defer client.Close()
 	var reply string
@@ -221,17 +294,17 @@ func rpcFindSuccessor(addr string, id *big.Int) (string, error) {
 	return reply, err
 }
 
-func rpcMigrateJoin(addr, predecessor string) error {
+func rpcMigrateWhenJoining(addr, predecessor string) error {
 	if addr == "" {
-		return errors.New("MigrateJoin: lack valid address")
+		return errors.New("Migrate when joining: lack valid address")
 	}
 	client := Dial(addr)
 	if client == nil {
-		return errors.New("MigrateJoin: client offline")
+		return errors.New("Migrate when joining: client offline")
 	}
 	defer client.Close()
 	var reply bool
-	err := client.Call("Node.MigrateJoin", predecessor, &reply)
+	err := client.Call("Node.MigrateWhenJoining", predecessor, &reply)
 	return err
 }
 
@@ -254,7 +327,6 @@ type RPCServer struct {
 	node      *Node
 	server    *rpc.Server
 	listener  net.Listener
-	Listening bool
 }
 
 // NewRPCServer exported
@@ -274,14 +346,14 @@ func (s *RPCServer) Listen() error {
 	}
 	s.node.create()
 	s.listener = l
-	s.Listening = true
+	s.node.listening = true
 	go s.server.Accept(l)
 	return nil
 }
 
 // Quit exported
 func (s *RPCServer) Quit() {
-	s.Listening = false
+	s.node.listening = false
 	s.listener.Close()
 }
 

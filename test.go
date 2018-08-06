@@ -1,7 +1,5 @@
 package main 
 
-import "C"
-
 import (
 	"os"
 	"time"
@@ -51,11 +49,13 @@ func testNaive() {
 			putCmd(i)
 		}
 	}
+	/*
 	for i := 0; i < 5; i++ {
 		for j := 1; j <= data; j++ {
 			getCmd(i, j)
 		}
 	}
+	*/
 	dht.Green.Printf("Test Naive Complete: %.2f%% Correct\n", float64(opCount[1] - opCount[0]) / float64(opCount[1]) * 100)
 }
 
@@ -69,17 +69,59 @@ func testAlpha() {
 		c[i].JoinCmd(c[i - 1].Node.IP)
 		time.Sleep(time.Second)
 	}
-
 	for i := 0; i < 10; i++ {
 		for j := 0; j < 5; j++ {
 			putCmd(i)
 		}
+		/*
 		for j := 0; j < 10; j++ {
 			for k := 1; k <= data; k++ {
 				getCmd(j, k)
 			}
 		}
+		*/
 	}
+	dht.Green.Printf("Test Alpha Complete: %.2f%% Correct\n", float64(opCount[1] - opCount[0]) / float64(opCount[1]) * 100)
+}
+
+func testBeta() {
+	dht.Magenta.Println(dht.TimeClock())
+	dht.Magenta.Println(dht.TimeClock(), "Test Beta starts")
+	opCount[0] = 0
+	opCount[1] = 0
+
+	for i := 0; i < 9; i++ {
+		c[i].QuitCmd()
+		time.Sleep(1 * time.Second)
+		/*
+		for j := i + 1; j < 10; j++ {
+			for k := 1; k <= data; k++ {
+				getCmd(j, k)
+			}
+		}
+		*/
+	}
+	dht.Green.Printf("Test Alpha Complete: %.2f%% Correct\n", float64(opCount[1] - opCount[0]) / float64(opCount[1]) * 100)
+}
+
+func testGamma() {
+	dht.Magenta.Println(dht.TimeClock())
+	dht.Magenta.Println(dht.TimeClock(), "Test Gamma starts")
+	opCount[0] = 0
+	opCount[1] = 0
+
+	
+	for i := 10; i < 15; i++ {
+		c[i].PortCmd(strconv.Itoa(8000 + i))
+		c[i].JoinCmd(c[i - 1].Node.IP)
+		time.Sleep(1 * time.Second)
+		for j := 9; j <= i; j++ {
+			for k := 1; k <= data; k++ {
+				getCmd(j, k)
+			}
+		}
+	}
+	
 	dht.Green.Printf("Test Alpha Complete: %.2f%% Correct\n", float64(opCount[1] - opCount[0]) / float64(opCount[1]) * 100)
 }
 
@@ -89,6 +131,8 @@ func main() {
 
 	testNaive()
 	testAlpha()
+	testBeta()
+	testGamma()
 
 	os.Exit(0)
 }
