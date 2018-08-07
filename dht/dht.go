@@ -16,7 +16,7 @@ type Node struct {
 	id *big.Int
 	listening bool
 	next int
-	finger [13]string
+	finger [161]string
 }
 
 // PutArgs exported
@@ -65,6 +65,9 @@ func (n *Node) stabilize() {
 		}
 		ok := true
 		client := Dial(suc)
+		if client == nil {
+			continue
+		}
 		defer client.Close()
 		for i := 1; i < 3; i++ {
 			err = client.Call("Node.PassSuccessor", i - 1, &n.successor[i])
@@ -93,7 +96,7 @@ func (n *Node) checkPredecessor() {
 
 func (n *Node) fixFingers() {
 	n.next++
-	if (n.next > 12) {
+	if (n.next > 160) {
 		n.next = 1
 	}
 	n.finger[n.next], _ = rpcFindSuccessor(n.IP, jump(n.IP, n.next))
@@ -190,7 +193,7 @@ func (n *Node) FindSuccessor(id *big.Int, reply *string) error {
 }
 
 func (n *Node) closestPrecedingNode(id *big.Int) string {
-	for i := 12; i > 0; i-- {
+	for i := 160; i > 0; i-- {
 		status := ping(n.finger[i])
 		if status {
 			if between(HashString(n.IP), HashString(n.finger[i]), id, false) {

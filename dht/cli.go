@@ -37,6 +37,7 @@ func (c *Chord) CreateCmd(args ...string) error {
 // QuitCmd exported
 func (c *Chord) QuitCmd(args ...string) error {
 	// migrate data
+	Magenta.Printf("%v Quit normally from %v\n", TimeClock(), c.Node.IP)
 	if c.server != nil {
 		defer c.server.Quit()
 		for _, suc := range c.Node.successor {
@@ -44,13 +45,12 @@ func (c *Chord) QuitCmd(args ...string) error {
 			if !status {
 				continue
 			}
-			err := c.Node.migrateWhenQuiting(suc)
-			if err != nil {
-				return err
-			}
+			c.Node.migrateWhenQuiting(suc)
 			break
 		}
 	}
+	c.Node = nil
+	c.server = nil
 	return nil
 }
 
