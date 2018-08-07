@@ -152,6 +152,7 @@ func getCmd(i, j int) {
 func deleteCmd(i, j int) {
 	opCount[1]++
 	err := c[i].DeleteCmd(strconv.Itoa(j))
+	dataCount[0]++
 	if err != nil {
 		opCount[0]++
 	}
@@ -171,7 +172,7 @@ func testMachine() {
 			for i := 0; i < 15; i++ {
 				j := nodeCount[1]
 				c[j].PortCmd(strconv.Itoa(8000 + j))
-				c[j].JoinCmd(c[j - 1].Node.IP)
+				c[j].JoinCmd(c[node[j - 1]].Node.IP)
 				node[j] = j
 				nodeCount[1]++
 				time.Sleep(1 * time.Second)
@@ -210,7 +211,6 @@ func testMachine() {
 				deleteCmd(node[i], data[k])
 				k++
 				cnt++
-				dataCount[0]++
 			}
 		}
 	}

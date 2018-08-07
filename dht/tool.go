@@ -24,8 +24,7 @@ var (
     Red = color.New(color.FgRed)
 )
 
-// HashString exported
-func HashString(elt string) *big.Int {
+func hashString(elt string) *big.Int {
     hasher := sha1.New()
     hasher.Write([]byte(elt))
     return new(big.Int).SetBytes(hasher.Sum(nil))
@@ -72,15 +71,14 @@ var two = big.NewInt(2)
 var hashMod = new(big.Int).Exp(big.NewInt(2), big.NewInt(keySize), nil)
 
 func jump(address string, fingerentry int) *big.Int {
-    n := HashString(address)
+    n := hashString(address)
     fingerentryminus1 := big.NewInt(int64(fingerentry) - 1)
     jump := new(big.Int).Exp(two, fingerentryminus1, nil)
     sum := new(big.Int).Add(n, jump)
     return new(big.Int).Mod(sum, hashMod)
 }
 
-// Dial exported
-func Dial(addr string) *rpc.Client {
+func dial(addr string) *rpc.Client {
 	client, err := rpc.Dial("tcp", addr)
 	if err != nil {
 		return nil

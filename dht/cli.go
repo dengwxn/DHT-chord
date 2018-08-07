@@ -9,7 +9,7 @@ import (
 // Chord exported
 type Chord struct {
 	Node *Node 
-	server *RPCServer 
+	server *rpcServer 
 	port string
 }
 
@@ -25,7 +25,7 @@ func (c *Chord) CreateCmd(args ...string) error {
 		return errors.New("Create: have created or joined")
 	}
 	c.dispatch()
-	err := c.server.Listen()
+	err := c.server.listen()
 	if err != nil {
 		panic(err)
 	}
@@ -39,7 +39,7 @@ func (c *Chord) QuitCmd(args ...string) error {
 	// migrate data
 	Magenta.Printf("%v Quit normally from %v\n", TimeClock(), c.Node.IP)
 	if c.server != nil {
-		defer c.server.Quit()
+		defer c.server.quit()
 		for _, suc := range c.Node.successor {
 			status := ping(suc)
 			if !status {
@@ -63,7 +63,7 @@ func (c *Chord) JoinCmd(args ...string) error {
 		return errors.New("Join: lack valid address")
 	}
 	c.dispatch()
-	err := c.server.Join(args[0])
+	err := c.server.join(args[0])
 	if err != nil {
 		panic(err)
 	}
@@ -88,7 +88,7 @@ func (c *Chord) PortCmd(args ...string) error {
 // PutCmd exported
 func (c *Chord) PutCmd(args ...string) error {
 	addr := c.Node.find(args[0])
-	client := Dial(addr)
+	client := dial(addr)
 	if client == nil {
 		return errors.New("Put: client offline")
 	}
@@ -109,7 +109,7 @@ func (c *Chord) PutCmd(args ...string) error {
 // GetCmd exported
 func (c *Chord) GetCmd(args ...string) error {
 	addr := c.Node.find(args[0])
-	client := Dial(addr)
+	client := dial(addr)
 	if client == nil {
 		return errors.New("Get: client offline")
 	}
@@ -131,7 +131,7 @@ func (c *Chord) GetCmd(args ...string) error {
 // DeleteCmd exported
 func (c *Chord) DeleteCmd(args ...string) error {
 	addr := c.Node.find(args[0])
-	client := Dial(addr)
+	client := dial(addr)
 	if client == nil {
 		return errors.New("Delete: client offline")
 	}
@@ -152,11 +152,11 @@ func (c *Chord) DeleteCmd(args ...string) error {
 
 // DumpCmd exported
 func (c *Chord) DumpCmd(args ...string) error {
-	c.server.Dump()
+	c.server.dump()
 	return nil
 }
 
 func (c *Chord) dispatch() {
-	c.Node = NewNode(c.port)
-	c.server = NewRPCServer(c.Node)
+	c.Node = newNode(c.port)
+	c.server = newrpcServer(c.Node)
 }

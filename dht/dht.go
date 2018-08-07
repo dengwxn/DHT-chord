@@ -24,18 +24,17 @@ type PutArgs struct {
 	Key, Val string
 }
 
-// NewNode exported
-func NewNode(port string) *Node {
+func newNode(port string) *Node {
 	addr := getLocalAddress()
-	return &Node{
+	return &Node {
 		IP:   addr + ":" + port,
 		data: make(map[string]string),
-		id:   HashString(addr + ":" + port),
+		id:   hashString(addr + ":" + port),
 	}
 }
 
 func ping(addr string) (bool) {
-	client := Dial(addr)
+	client := dial(addr)
 	if client == nil {
 		return false
 	} 
@@ -57,14 +56,14 @@ func (n *Node) stabilize() {
 		n.successor[0] = suc
 		x, err := rpcGetPredecessor(suc)
 		if err == nil {
-			if between(n.id, HashString(x), HashString(suc), false) {
+			if between(n.id, hashString(x), hashString(suc), false) {
 				n.successor[0] = x
 			}
 		} else {
 			Cyan.Println(TimeClock(), "stabilize:", err, "from", suc, "at", n.IP)
 		}
 		ok := true
-		client := Dial(suc)
+		client := dial(suc)
 		if client == nil {
 			continue
 		}
@@ -147,7 +146,7 @@ func (n *Node) create() {
 
 func (n *Node) join(addr string) error {
 	n.predecessor = ""
-	successor, err := rpcFindSuccessor(addr, HashString(n.IP))
+	successor, err := rpcFindSuccessor(addr, hashString(n.IP))
 	if err != nil {
 		return err
 	}
@@ -164,7 +163,7 @@ func (n *Node) GetPredecessor(none bool, addr *string) error {
 
 // Notify exported
 func (n *Node) Notify(addr string, reply *bool) error {
-	if n.predecessor == "" || between(HashString(n.predecessor), HashString(addr), n.id, false) {
+	if n.predecessor == "" || between(hashString(n.predecessor), hashString(addr), n.id, false) {
 		n.predecessor = addr
 	}
 	return nil
@@ -177,7 +176,7 @@ func (n *Node) FindSuccessor(id *big.Int, reply *string) error {
 		if !status {
 			continue
 		}
-		if between(n.id, id, HashString(suc), true) {
+		if between(n.id, id, hashString(suc), true) {
 			*reply = suc
 			return nil
 		}
@@ -196,7 +195,7 @@ func (n *Node) closestPrecedingNode(id *big.Int) string {
 	for i := 160; i > 0; i-- {
 		status := ping(n.finger[i])
 		if status {
-			if between(HashString(n.IP), HashString(n.finger[i]), id, false) {
+			if between(hashString(n.IP), hashString(n.finger[i]), id, false) {
 				return n.finger[i]
 			}
 		}
@@ -205,7 +204,7 @@ func (n *Node) closestPrecedingNode(id *big.Int) string {
 		suc := n.successor[i]
 		status := ping(suc)
 		if status {
-			if between(HashString(n.IP), HashString(suc), id, false) {
+			if between(hashString(n.IP), hashString(suc), id, false) {
 				return suc
 			}
 		}
@@ -242,14 +241,14 @@ func (n *Node) Ping(none bool, reply *bool) error {
 
 // MigrateWhenJoining exported
 func (n *Node) MigrateWhenJoining(addr string, reply *bool) error {
-	client := Dial(addr)
+	client := dial(addr)
 	if client == nil {
 		Green.Println(addr)
 		return errors.New("Migrate when joining: client offline")
 	}
 	defer client.Close()
 	for k, v := range n.data {
-		if between(HashString(k), HashString(addr), HashString(n.IP), true) {
+		if between(hashString(k), hashString(addr), hashString(n.IP), true) {
 			n.Delete(k, reply)
 			putArgs := PutArgs {
 				Key: k,
@@ -266,7 +265,7 @@ func (n *Node) MigrateWhenJoining(addr string, reply *bool) error {
 }
 
 func (n *Node) migrateWhenQuiting(addr string) error {
-	client := Dial(addr)
+	client := dial(addr)
 	if client == nil {
 		return errors.New("Migrate when quiting: client offline")
 	}
@@ -297,7 +296,7 @@ func rpcGetPredecessor(addr string) (string, error) {
 	if addr == "" {
 		return "", errors.New("get predecessor: lack valid address")
 	}
-	client := Dial(addr)
+	client := dial(addr)
 	if client == nil {
 		return "", errors.New("get predecessor: client offline")
 	}
@@ -317,7 +316,7 @@ func rpcNotify(addr, predecessor string) error {
 	if addr == "" {
 		return errors.New("notify: lack valid address")
 	}
-	client := Dial(addr)
+	client := dial(addr)
 	if client == nil {
 		return errors.New("notify: client offline")
 	}
@@ -330,7 +329,7 @@ func rpcFindSuccessor(addr string, id *big.Int) (string, error) {
 	if addr == "" {
 		return "", errors.New("find successor: lack valid address")
 	}
-	client := Dial(addr)
+	client := dial(addr)
 	if client == nil {
 		return "", errors.New("find successor: client offline")
 	}
@@ -344,7 +343,7 @@ func rpcMigrateWhenJoining(addr, predecessor string) error {
 	if addr == "" {
 		return errors.New("Migrate when joining: lack valid address")
 	}
-	client := Dial(addr)
+	client := dial(addr)
 	if client == nil {
 		return errors.New("Migrate when joining: client offline")
 	}
@@ -355,35 +354,32 @@ func rpcMigrateWhenJoining(addr, predecessor string) error {
 }
 
 func (n *Node) find(key string) string {
-	client := Dial(n.IP)
+	client := dial(n.IP)
 	if client == nil {
 		panic(errors.New("Dial localhost failed"))
 	}
 	defer client.Close()
 	var reply string
-	err := client.Call("Node.FindSuccessor", HashString(key), &reply)
+	err := client.Call("Node.FindSuccessor", hashString(key), &reply)
 	if err != nil {
 		Yellow.Println(TimeClock(), err)
 	}
 	return reply
 }
 
-// RPCServer exported
-type RPCServer struct {
+type rpcServer struct {
 	node      *Node
 	server    *rpc.Server
 	listener  net.Listener
 }
 
-// NewRPCServer exported
-func NewRPCServer(n *Node) *RPCServer {
-	return &RPCServer{
+func newrpcServer(n *Node) *rpcServer {
+	return &rpcServer{
 		node: n,
 	}
 }
 
-// Listen exported
-func (s *RPCServer) Listen() error {
+func (s *rpcServer) listen() error {
 	s.server = rpc.NewServer()
 	s.server.Register(s.node)
 	l, e := net.Listen("tcp", s.node.IP)
@@ -397,15 +393,13 @@ func (s *RPCServer) Listen() error {
 	return nil
 }
 
-// Quit exported
-func (s *RPCServer) Quit() {
+func (s *rpcServer) quit() {
 	s.node.listening = false
 	s.listener.Close()
 }
 
-// Join exported
-func (s *RPCServer) Join(addr string) error {
-	err := s.Listen()
+func (s *rpcServer) join(addr string) error {
+	err := s.listen()
 	if err != nil {
 		return err
 	}
@@ -416,8 +410,7 @@ func (s *RPCServer) Join(addr string) error {
 	return nil
 }
 
-// Dump exported
-func (s *RPCServer) Dump() {
+func (s *rpcServer) dump() {
 	Red.Println(TimeClock(), "Address:", s.node.IP)
 	Red.Println(TimeClock(), "ID:", s.node.id)
 	Red.Println(TimeClock(), "Successor:", s.node.successor)
