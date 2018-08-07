@@ -1,7 +1,5 @@
 package dht
 
-import "C"
-
 import (
 	"errors"
 )
