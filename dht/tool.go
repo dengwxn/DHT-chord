@@ -9,8 +9,8 @@ import (
 	"github.com/fatih/color"
 )
 
-var (
-    // Blue exported
+var ( 
+	// Blue exported
 	Blue = color.New(color.FgBlue)
     // Magenta exported
     Magenta = color.New(color.FgMagenta)
