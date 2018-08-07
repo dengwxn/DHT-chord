@@ -83,7 +83,7 @@ func dial(addr string) *rpc.Client {
 	if err != nil {
 		return nil
 	}
-	return client
+    return client
 }
 
 // TimeDate exported
