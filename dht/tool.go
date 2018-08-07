@@ -42,8 +42,8 @@ func getLocalAddress() string {
             addrs, err := elt.Addrs()
             if err != nil {
                 panic("init: failed to get addresses for network interface")
-            }
-			for _, addr := range addrs {
+            } 
+            for _, addr := range addrs {
                 if ipnet, ok := addr.(*net.IPNet); ok {
                     if ip4 := ipnet.IP.To4(); len(ip4) == net.IPv4len {
                         localaddress = ip4.String()
