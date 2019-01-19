@@ -1,6 +1,7 @@
 package dht
 
 import (
+	"time"
 	"errors"
 )
 
@@ -34,8 +35,7 @@ func (c *Chord) CreateCmd(args ...string) error {
 
 // QuitCmd exported
 func (c *Chord) QuitCmd(args ...string) error {
-	// migrate data
-	Magenta.Printf("%v Quit normally from %v\n", TimeClock(), c.Node.IP)
+	defer Magenta.Printf("%v Quit normally from %v\n", TimeClock(), c.Node.IP)
 	if c.server != nil {
 		defer c.server.quit()
 		for _, suc := range c.Node.successor {
@@ -43,13 +43,43 @@ func (c *Chord) QuitCmd(args ...string) error {
 			if !status {
 				continue
 			}
-			c.Node.migrateWhenQuiting(suc)
+			err := c.Node.migrateWhenQuiting(suc)
+			if err != nil {
+				continue
+			}
 			break
 		}
 	}
 	c.Node = nil
 	c.server = nil
 	return nil
+}
+
+// ForceQuitCmd exported
+func (c *Chord) ForceQuitCmd(args ...string) error {
+	// debug backup function
+	// in real circumstance, these won't be executed
+	c.Node.bufferWriter.Flush()
+	defer Yellow.Printf("%v Force Quit from %v\n", TimeClock(), c.Node.IP)
+	if c.server != nil {
+		defer c.server.forceQuit()
+	}
+	c.Node = nil
+	c.server = nil
+	return nil
+}
+
+func (c *Chord) recover() {
+	time.Sleep(1 * time.Second)
+	for key, value := range c.Node.backup {
+		err := c.PutCmd(key, value)
+		if err != nil {
+			Magenta.Printf("%v Fail to recover data (%v, %v)\n", TimeClock(), key, value)
+		} else {
+			Green.Printf("%v Recover (%v, %v) from %v\n", TimeClock(), key, value, c.Node.IP)
+		}
+		delete(c.Node.backup, key)
+	}
 }
 
 // JoinCmd exported
@@ -65,6 +95,7 @@ func (c *Chord) JoinCmd(args ...string) error {
 	if err != nil {
 		panic(err)
 	}
+	go c.recover()
 	Magenta.Printf("%v Join at %v\n", TimeClock(), args[0])
 	return nil
 }
@@ -154,7 +185,10 @@ func (c *Chord) DumpCmd(args ...string) error {
 	return nil
 }
 
-func (c *Chord) dispatch() {
+func (c *Chord) dispatch() error {
 	c.Node = newNode(c.port)
+	c.Node.getBackup()
+	c.Node.startBackup()
 	c.server = newrpcServer(c.Node)
+	return nil
 }

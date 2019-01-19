@@ -1,22 +1,28 @@
 package dht
 
 import (
+	"strings"
 	"errors"
 	"math/big"
 	"net"
 	"net/rpc"
 	"time"
+	"bufio"
+	"os"
+	"io/ioutil"
 )
 
 // Node exported
 type Node struct {
 	successor [3]string
 	IP, predecessor string
-	data map[string]string
+	data, backup map[string]string
 	id *big.Int
 	listening bool
 	next int
 	finger [161]string
+	bufferWriter *bufio.Writer
+	file *os.File
 }
 
 // PutArgs exported
@@ -26,11 +32,42 @@ type PutArgs struct {
 
 func newNode(port string) *Node {
 	addr := getLocalAddress()
+	ip := addr + ":" + port
 	return &Node {
-		IP:   addr + ":" + port,
+		IP: ip,
 		data: make(map[string]string),
-		id:   hashString(addr + ":" + port),
+		backup: make(map[string]string),
+		id: hashString(ip),
 	}
+}
+
+func (n *Node) startBackup() error {
+	var err error
+	n.file, err = os.OpenFile("./backup/" + n.IP + ".txt", os.O_CREATE | os.O_TRUNC | os.O_WRONLY | os.O_APPEND, 0666)
+	if err != nil {
+		Red.Println(err)
+		return err
+	}
+	n.bufferWriter = bufio.NewWriter(n.file)
+	return nil
+}
+
+func (n *Node) getBackup() error {
+	input, err := ioutil.ReadFile("./backup/" + n.IP + ".txt")
+	if err != nil {
+		return err
+	}
+	data := strings.Split(strings.TrimSpace(string(input)), " ")
+	for i := 0; i < len(data); i++ {
+		if data[i] == "0" {
+			n.backup[data[i + 1]] = data[i + 2]
+			i += 2
+		} else if data[i] == "1" {
+			delete(n.backup, data[i + 1])
+			i++
+		}
+	}
+	return nil
 }
 
 func ping(addr string) (bool) {
@@ -216,6 +253,7 @@ func (n *Node) closestPrecedingNode(id *big.Int) string {
 func (n *Node) Put(args PutArgs, reply *bool) error {
 	n.data[args.Key] = args.Val
 	*reply = true
+	n.bufferWriter.WriteString("0 " + args.Key + " " + args.Val + " ")
 	return nil
 }
 
@@ -227,9 +265,10 @@ func (n *Node) Get(key string, reply *string) error {
 
 // Delete exported
 func (n *Node) Delete(key string, reply *bool) error {
-	if n.data[key] != "" {
+	if _, ok := n.data[key]; ok {
 		*reply = true
 		delete(n.data, key)
+		n.bufferWriter.WriteString("1 " + key + " ")
 	}
 	return nil
 }
@@ -394,6 +433,20 @@ func (s *rpcServer) listen() error {
 }
 
 func (s *rpcServer) quit() {
+	s.node.file.Close()
+	file, err := os.OpenFile("./backup/" + s.node.IP + ".txt", os.O_CREATE | os.O_TRUNC | os.O_WRONLY, 0666)
+	if err != nil {
+		panic(err)
+	}
+	file.Close()
+	s.node.listening = false
+	s.listener.Close()
+}
+
+// debug backup function
+// in real circumstance, these won't be executed
+func (s *rpcServer) forceQuit() {
+	s.node.file.Close()
 	s.node.listening = false
 	s.listener.Close()
 }

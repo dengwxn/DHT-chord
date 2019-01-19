@@ -167,7 +167,7 @@ func testMachine() {
 	c[0].CreateCmd()
 	time.Sleep(1 * time.Second)
 	for rnd := 0; rnd < 10; rnd++ {
-		randomShuffleNode()
+		//randomShuffleNode()
 		if (rnd & 1) == 0 {
 			for i := 0; i < 15; i++ {
 				j := nodeCount[1]
@@ -186,7 +186,7 @@ func testMachine() {
 			}
 		}
 		opAverage := 300 / (nodeCount[1] - nodeCount[0]) + 1
-		randomShuffleNode()
+		//randomShuffleNode()
 		for i, cnt := nodeCount[0], 0; i < nodeCount[1] && cnt < 300; i++ {
 			for j := 0; j < opAverage && cnt < 300; j++ {
 				putCmd(node[i])
@@ -194,8 +194,8 @@ func testMachine() {
 			}
 		}
 		opAverage = 200 / (nodeCount[1] - nodeCount[0]) + 1
-		randomShuffleNode()
-		randomShuffleData()
+		//randomShuffleNode()
+		//randomShuffleData()
 		for i, k, cnt := nodeCount[0], dataCount[0], 0; i < nodeCount[1] && cnt < 200; i++ {
 			for j := 0; j < opAverage && cnt < 200; j++ {
 				getCmd(node[i], data[k])
@@ -204,8 +204,8 @@ func testMachine() {
 			}
 		}
 		opAverage = 150 / (nodeCount[1] - nodeCount[0]) + 1
-		randomShuffleNode()
-		randomShuffleData()
+		//randomShuffleNode()
+		//randomShuffleData()
 		for i, k, cnt := nodeCount[0], dataCount[0], 0; i < nodeCount[1] && cnt < 150; i++ {
 			for j := 0; j < opAverage && cnt < 150; j++ {
 				deleteCmd(node[i], data[k])
@@ -215,6 +215,44 @@ func testMachine() {
 		}
 	}
 	dht.Green.Printf("Test Machine Complete: %.2f%% Correct\n", float64(opCount[1] - opCount[0]) / float64(opCount[1]) * 100)
+}
+
+func testBackup() {
+	dht.Magenta.Println(dht.TimeClock())
+	dht.Magenta.Println(dht.TimeClock(), "Test Backup starts")
+	for i := 0; i < 5; i++ {
+		c[i].PortCmd(strconv.Itoa(8000 + i))
+		if i == 0 {
+			c[i].CreateCmd()
+		} else {
+			c[i].JoinCmd(c[i - 1].Node.IP)
+		}
+		time.Sleep(time.Second)
+	}
+	for i := 0; i < 5; i++ {
+		for k := 0; k < 10; k++ {
+			putCmd(i)
+		}
+	}
+	for i := 0; i < 5; i++ {
+		for j := 0; j < dataCount[1]; j++ {
+			getCmd(i, j)
+		}
+	}
+	c[0].ForceQuitCmd()
+	time.Sleep(1 * time.Second)
+	for i := 1; i < 2; i++ {
+		for j := 0; j < dataCount[1]; j++ {
+			getCmd(i, j)
+		}
+	}
+	c[0].JoinCmd(c[1].Node.IP)
+	time.Sleep(2 * time.Second)
+	for i := 0; i < 1; i++ {
+		for j := 0; j < dataCount[1]; j++ {
+			getCmd(i, j)
+		}
+	}
 }
 
 func main() {
@@ -228,6 +266,7 @@ func main() {
 	testGamma()
 	*/
 	testMachine()
+	//testBackup()
 
 	os.Exit(0)
 }
